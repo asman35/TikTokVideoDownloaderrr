@@ -63,6 +63,13 @@ private fun DownloaderScreen(viewModel: MainViewModel = viewModel()) {
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text("TikTok Video İndirici", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(6.dp))
+        Text(
+            "Canım Babam",
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.primary,
+            fontWeight = FontWeight.SemiBold
+        )
         Spacer(Modifier.height(8.dp))
         Text("TikTok bağlantısını yapıştırın ve videoyu cihazınıza indirin.")
         Spacer(Modifier.height(24.dp))

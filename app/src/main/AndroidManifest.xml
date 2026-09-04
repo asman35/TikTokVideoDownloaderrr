@@ -4,7 +4,9 @@
 
     <application
         android:allowBackup="true"
+        android:icon="@drawable/ic_launcher"
         android:label="TikTok Video İndirici"
+        android:roundIcon="@drawable/ic_launcher"
         android:supportsRtl="true"
         android:theme="@style/Theme.TikTokVideoDownloader"
         android:usesCleartextTraffic="false">

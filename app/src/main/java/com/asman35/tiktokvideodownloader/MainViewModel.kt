@@ -36,7 +36,9 @@ class MainViewModel(
         }
 
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, message = "Video hazırlanıyor…") }
+            _uiState.update {
+                it.copy(link = "", isLoading = true, message = "Video hazırlanıyor…")
+            }
             runCatching { repository.resolve(link) }
                 .onSuccess { video ->
                     _uiState.update {
@@ -55,7 +57,11 @@ class MainViewModel(
     }
 
     fun downloadStarted() = _uiState.update {
-        it.copy(message = "İndirme başlatıldı. Bildirimlerden takip edebilirsiniz.", resolvedVideo = null)
+        it.copy(
+            link = "",
+            message = "İndirme başlatıldı. Bildirimlerden takip edebilirsiniz.",
+            resolvedVideo = null
+        )
     }
 
     private fun isTikTokLink(value: String): Boolean = runCatching {
