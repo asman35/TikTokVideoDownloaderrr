@@ -154,6 +154,8 @@ def instagram_graphql_media(url: str):
     root = items[0]
     children = root.get("carousel_media") or [root]
     result = []
+    caption_obj = root.get("caption") or {}
+    caption_text = (caption_obj.get("text") or "").strip() or None
 
     for index, media in enumerate(children, start=1):
         video_versions = media.get("video_versions") or []
@@ -185,6 +187,69 @@ def instagram_graphql_media(url: str):
 
     return result
 
+
+def x_status_id(url: str):
+    match = re.search(r"/status/(\\d+)", urlparse(url).path)
+    return match.group(1) if match else None
+
+def fxtwitter_media(url: str):
+    status_id = x_status_id(url)
+    if not status_id:
+        return None
+
+    api_url = f"https://api.fxtwitter.com/2/status/{status_id}"
+    req = urllib.request.Request(
+        api_url,
+        headers={"User-Agent": "MediaSave/1.6 (+https://github.com/asman35/TikTokVideoDownloaderrr)"}
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=20) as response:
+            payload = json.loads(response.read().decode("utf-8", errors="ignore"))
+    except Exception:
+        return None
+
+    status = payload.get("status") or {}
+    if status.get("type") != "status":
+        return None
+
+    media = status.get("media") or {}
+    all_media = media.get("all") or []
+    if not all_media:
+        all_media = (media.get("photos") or []) + (media.get("videos") or [])
+
+    result = []
+    for index, item in enumerate(all_media, start=1):
+        item_type = item.get("type")
+        if item_type in ("photo", "mosaic_photo"):
+            media_url = item.get("url")
+            if media_url:
+                result.append({
+                    "url": media_url,
+                    "type": "IMAGE",
+                    "ext": "jpg",
+                    "index": index
+                })
+        elif item_type in ("video", "gif"):
+            formats = [
+                fmt for fmt in (item.get("formats") or [])
+                if fmt.get("url") and fmt.get("container") == "mp4"
+            ]
+            formats.sort(key=lambda fmt: fmt.get("bitrate") or 0, reverse=True)
+            media_url = (formats[0].get("url") if formats else None) or item.get("url")
+            if media_url:
+                result.append({
+                    "url": media_url,
+                    "type": "VIDEO",
+                    "ext": "mp4",
+                    "index": index
+                })
+
+    return {
+        "title": (status.get("text") or "").strip() or None,
+        "description": (status.get("text") or "").strip() or None,
+        "items": result
+    }
+
 def yt_options(platform: str, download: bool = False):
     opts = {
         "quiet": True,
@@ -193,10 +258,16 @@ def yt_options(platform: str, download: bool = False):
         "http_headers": {"User-Agent": UA},
     }
     if download:
-        opts.update({
-            "format": "bestvideo*+bestaudio/best",
-            "merge_output_format": "mp4",
-        })
+        if platform == "YouTube":
+            opts.update({
+                "format": "bestvideo[ext=mp4][vcodec^=avc1]+bestaudio[ext=m4a]/best[ext=mp4][vcodec^=avc1]/best[ext=mp4]/best",
+                "merge_output_format": "mp4",
+            })
+        else:
+            opts.update({
+                "format": "bestvideo*+bestaudio/best",
+                "merge_output_format": "mp4",
+            })
     else:
         opts["skip_download"] = True
 
@@ -319,19 +390,48 @@ def resolve(req: ResolveRequest, request: Request):
     platform = platform_for(host)
 
     if platform == "Instagram":
-        ig_media = instagram_graphql_media(req.url)
-        if ig_media:
+        ig_data = instagram_graphql_media(req.url)
+        if ig_data and ig_data.get("items"):
+            title = ig_data.get("title") or f"Instagram {instagram_shortcode(req.url) or 'media'}"
             items = []
-            for media in ig_media:
-                file_name = f"instagram_{instagram_shortcode(req.url) or 'media'}_{media['index']}.{media['ext']}"
+            for media in ig_data["items"]:
+                base = safe_name(title, f"instagram_{instagram_shortcode(req.url) or 'media'}")
+                suffix = f"_{media['index']}" if len(ig_data["items"]) > 1 else ""
+                file_name = f"{base}{suffix}.{media['ext']}"
                 items.append({
                     "downloadUrl": build_asset_url(request, media["url"], req.url, file_name),
                     "fileName": file_name,
-                    "type": media["type"]
+                    "type": media["type"],
+                    "title": title,
+                    "description": ig_data.get("description")
                 })
             return {
                 "platform": platform,
-                "title": None,
+                "title": title,
+                "description": ig_data.get("description"),
+                "items": items
+            }
+
+    if platform == "X":
+        x_data = fxtwitter_media(req.url)
+        if x_data and x_data.get("items"):
+            title = x_data.get("title") or f"X {x_status_id(req.url) or 'media'}"
+            items = []
+            for media in x_data["items"]:
+                base = safe_name(title, f"x_{x_status_id(req.url) or 'media'}")
+                suffix = f"_{media['index']}" if len(x_data["items"]) > 1 else ""
+                file_name = f"{base}{suffix}.{media['ext']}"
+                items.append({
+                    "downloadUrl": build_asset_url(request, media["url"], req.url, file_name),
+                    "fileName": file_name,
+                    "type": media["type"],
+                    "title": title,
+                    "description": x_data.get("description")
+                })
+            return {
+                "platform": platform,
+                "title": title,
+                "description": x_data.get("description"),
                 "items": items
             }
 
@@ -345,18 +445,23 @@ def resolve(req: ResolveRequest, request: Request):
 
     if info and has_video(info):
         media_id = info.get("id") or "video"
-        file_name = f"{platform.lower()}_{media_id}.mp4"
+        title = (info.get("title") or "").strip() or f"{platform} {media_id}"
+        description = (info.get("description") or "").strip() or None
+        file_name = f"{safe_name(title, platform.lower() + '_' + media_id)}.mp4"
         direct = (
             f"{public_base(request)}/download-video?url={quote(req.url, safe='')}"
             f"&name={quote(file_name, safe='')}"
         )
         return {
             "platform": platform,
-            "title": info.get("title"),
+            "title": title,
+            "description": description,
             "items": [{
                 "downloadUrl": direct,
                 "fileName": file_name,
-                "type": "VIDEO"
+                "type": "VIDEO",
+                "title": title,
+                "description": description
             }]
         }
 
