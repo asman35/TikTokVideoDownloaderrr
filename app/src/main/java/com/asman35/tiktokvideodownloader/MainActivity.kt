@@ -62,7 +62,7 @@ private fun DownloaderScreen(viewModel: MainViewModel = viewModel()) {
         )
         Spacer(Modifier.height(6.dp))
         Text(
-            "TikTok • Instagram • YouTube",
+            "TikTok • Instagram • YouTube • X",
             color = MaterialTheme.colorScheme.primary
         )
         Spacer(Modifier.height(8.dp))
