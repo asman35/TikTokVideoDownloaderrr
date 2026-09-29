@@ -17,3 +17,10 @@ Instagram ve YouTube çözümleme katmanı sonraki aşamada, yalnızca herkese a
 Her main güncellemesinde GitHub Actions `MediaSave-debug` adlı APK artifact'i üretir.
 
 > Yalnızca indirme hakkına sahip olduğunuz içerikleri indirin ve ilgili platformların koşullarına uyun.
+
+
+## v1.1
+
+- WhatsApp durum klasörü seçip fotoğraf/video dosyalarını MediaSave klasörüne kopyalama eklendi.
+- Instagram ve YouTube için sunucu çözümleyici kaynak kodu `server/` altında eklendi.
+- Instagram/YouTube özelliğinin APK içinde çalışması için bu sunucu HTTPS üzerinde yayınlanmalı ve `API_BASE_URL` değeri yayınlanan adresle değiştirilmelidir.
