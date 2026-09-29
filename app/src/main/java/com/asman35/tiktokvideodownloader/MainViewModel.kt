@@ -9,13 +9,12 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.net.URI
 
 data class DownloadUiState(
     val link: String = "",
     val isLoading: Boolean = false,
     val message: String? = null,
-    val resolvedVideo: ResolveResponse? = null
+    val resolved: ResolveResponse? = null
 )
 
 class MainViewModel(
@@ -25,48 +24,42 @@ class MainViewModel(
     val uiState: StateFlow<DownloadUiState> = _uiState.asStateFlow()
 
     fun onLinkChanged(link: String) = _uiState.update {
-        it.copy(link = link, message = null, resolvedVideo = null)
+        it.copy(link = link, message = null, resolved = null)
     }
 
     fun resolveLink() {
         val link = _uiState.value.link.trim()
-        if (!isTikTokLink(link)) {
-            _uiState.update { it.copy(message = "Geçerli bir TikTok bağlantısı girin.") }
+        if (repository.detectPlatform(link) == "unknown") {
+            _uiState.update { it.copy(message = "Desteklenen bir bağlantı girin.") }
             return
         }
 
         viewModelScope.launch {
             _uiState.update {
-                it.copy(link = "", isLoading = true, message = "Video hazırlanıyor…")
+                it.copy(isLoading = true, message = "İçerik hazırlanıyor…", resolved = null)
             }
+
             runCatching { repository.resolve(link) }
-                .onSuccess { video ->
+                .onSuccess { media ->
                     _uiState.update {
-                        it.copy(isLoading = false, message = null, resolvedVideo = video)
+                        it.copy(isLoading = false, message = null, resolved = media)
                     }
                 }
                 .onFailure { error ->
                     _uiState.update {
                         it.copy(
                             isLoading = false,
-                            message = error.message ?: "Video bağlantısı alınamadı."
+                            message = error.message ?: "İçerik bağlantısı alınamadı."
                         )
                     }
                 }
         }
     }
 
-    fun downloadStarted() = _uiState.update {
+    fun downloadStarted(count: Int) = _uiState.update {
         it.copy(
-            link = "",
-            message = "İndirme başlatıldı. Bildirimlerden takip edebilirsiniz.",
-            resolvedVideo = null
+            message = if (count > 1) "$count dosya indirmeye eklendi." else "İndirme başlatıldı.",
+            resolved = null
         )
     }
-
-    private fun isTikTokLink(value: String): Boolean = runCatching {
-        val uri = URI(value)
-        uri.scheme in listOf("http", "https") &&
-            (uri.host?.lowercase()?.let { it == "tiktok.com" || it.endsWith(".tiktok.com") } == true)
-    }.getOrDefault(false)
 }
