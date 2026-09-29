@@ -47,14 +47,14 @@ class DownloaderRepository {
     suspend fun resolve(url: String): ResolveResponse {
         return when (detectPlatform(url)) {
             "tiktok" -> resolveTikTok(url)
-            "instagram", "youtube" -> resolveWithServer(url)
-            else -> error("Desteklenen bir TikTok, Instagram veya YouTube bağlantısı girin.")
+            "instagram", "youtube", "twitter" -> resolveWithServer(url)
+            else -> error("Desteklenen bir TikTok, Instagram, YouTube veya X bağlantısı girin.")
         }
     }
 
     private suspend fun resolveWithServer(url: String): ResolveResponse {
         if (BuildConfig.API_BASE_URL.contains("example.com")) {
-            error("Instagram/YouTube sunucusu henüz bağlanmadı.")
+            error("Instagram/YouTube/X sunucusu henüz bağlanmadı.")
         }
 
         val api = Retrofit.Builder()
@@ -113,7 +113,7 @@ class DownloaderRepository {
         when {
             host == "tiktok.com" || host.endsWith(".tiktok.com") -> "tiktok"
             host == "instagram.com" || host.endsWith(".instagram.com") -> "instagram"
-            host == "youtube.com" || host.endsWith(".youtube.com") || host == "youtu.be" -> "youtube"
+            host == "youtube.com" || host.endsWith(".youtube.com") || host == "youtu.be" -> "youtube"\n            host == "x.com" || host.endsWith(".x.com") || host == "twitter.com" || host.endsWith(".twitter.com") -> "twitter"
             else -> "unknown"
         }
     }.getOrDefault("unknown")
