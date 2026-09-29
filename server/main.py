@@ -3,13 +3,16 @@ from fastapi.responses import FileResponse, StreamingResponse
 from starlette.background import BackgroundTask
 from pydantic import BaseModel
 import html
+import http.cookiejar
 import ipaddress
+import json
 import os
 import re
 import shutil
 import socket
 import tempfile
 import urllib.request
+import urllib.parse
 from urllib.parse import quote, urlparse
 import yt_dlp
 
@@ -83,6 +86,104 @@ def scrape_og_media(url: str):
         return found
 
     return collect("og:video"), collect("og:image")
+
+def instagram_shortcode(url: str):
+    match = re.search(r"/(?:p|reel|reels|tv)/([A-Za-z0-9_-]+)", urlparse(url).path)
+    return match.group(1) if match else None
+
+def instagram_graphql_media(url: str):
+    shortcode = instagram_shortcode(url)
+    if not shortcode:
+        return []
+
+    jar = http.cookiejar.CookieJar()
+    opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(jar))
+    headers = {"User-Agent": UA, "Accept-Language": "en-US,en;q=0.9"}
+
+    try:
+        opener.open(urllib.request.Request("https://www.instagram.com/", headers=headers), timeout=15).read(64)
+    except Exception:
+        pass
+
+    csrf = ""
+    for cookie in jar:
+        if cookie.name == "csrftoken":
+            csrf = cookie.value
+            break
+
+    variables = {
+        "shortcode": shortcode,
+        "__relay_internal__pv__PolarisAIGMMediaWebLabelEnabledrelayprovider": False
+    }
+    body = urllib.parse.urlencode({
+        "doc_id": "27128499623469141",
+        "variables": json.dumps(variables, separators=(",", ":"))
+    }).encode("utf-8")
+
+    gql_headers = {
+        "User-Agent": UA,
+        "Accept": "*/*",
+        "Content-Type": "application/x-www-form-urlencoded",
+        "X-IG-App-ID": "936619743392459",
+        "Origin": "https://www.instagram.com",
+        "Referer": url,
+    }
+    if csrf:
+        gql_headers["X-CSRFToken"] = csrf
+
+    try:
+        req = urllib.request.Request(
+            "https://www.instagram.com/graphql/query",
+            data=body,
+            headers=gql_headers,
+            method="POST"
+        )
+        with opener.open(req, timeout=20) as response:
+            payload = json.loads(response.read().decode("utf-8", errors="ignore"))
+    except Exception:
+        return []
+
+    node = (
+        payload.get("data", {})
+        .get("xdt_api__v1__media__shortcode__web_info", {})
+    )
+    items = node.get("items") or []
+    if not items:
+        return []
+
+    root = items[0]
+    children = root.get("carousel_media") or [root]
+    result = []
+
+    for index, media in enumerate(children, start=1):
+        video_versions = media.get("video_versions") or []
+        if video_versions:
+            video_url = video_versions[0].get("url")
+            if video_url:
+                result.append({
+                    "url": video_url,
+                    "type": "VIDEO",
+                    "ext": "mp4",
+                    "index": index
+                })
+                continue
+
+        candidates = (
+            media.get("image_versions2", {}).get("candidates")
+            or root.get("image_versions2", {}).get("candidates")
+            or []
+        )
+        if candidates:
+            image_url = candidates[0].get("url")
+            if image_url:
+                result.append({
+                    "url": image_url,
+                    "type": "IMAGE",
+                    "ext": "jpg",
+                    "index": index
+                })
+
+    return result
 
 def yt_options(platform: str, download: bool = False):
     opts = {
@@ -216,6 +317,23 @@ def download_video(url: str, name: str = "mediasave_video.mp4"):
 def resolve(req: ResolveRequest, request: Request):
     host = safe_host(req.url)
     platform = platform_for(host)
+
+    if platform == "Instagram":
+        ig_media = instagram_graphql_media(req.url)
+        if ig_media:
+            items = []
+            for media in ig_media:
+                file_name = f"instagram_{instagram_shortcode(req.url) or 'media'}_{media['index']}.{media['ext']}"
+                items.append({
+                    "downloadUrl": build_asset_url(request, media["url"], req.url, file_name),
+                    "fileName": file_name,
+                    "type": media["type"]
+                })
+            return {
+                "platform": platform,
+                "title": None,
+                "items": items
+            }
 
     info = None
     extract_error = None
