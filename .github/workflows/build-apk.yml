@@ -1,4 +1,4 @@
-name: Build Android APK
+name: Build MediaSave APK
 
 on:
   workflow_dispatch:
@@ -25,5 +25,5 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: TikTokVideoDownloader-debug
+          name: MediaSave-debug
           path: app/build/outputs/apk/debug/app-debug.apk
