@@ -113,7 +113,8 @@ class DownloaderRepository {
         when {
             host == "tiktok.com" || host.endsWith(".tiktok.com") -> "tiktok"
             host == "instagram.com" || host.endsWith(".instagram.com") -> "instagram"
-            host == "youtube.com" || host.endsWith(".youtube.com") || host == "youtu.be" -> "youtube"\n            host == "x.com" || host.endsWith(".x.com") || host == "twitter.com" || host.endsWith(".twitter.com") -> "twitter"
+            host == "youtube.com" || host.endsWith(".youtube.com") || host == "youtu.be" -> "youtube"
+            host == "x.com" || host.endsWith(".x.com") || host == "twitter.com" || host.endsWith(".twitter.com") -> "twitter"
             else -> "unknown"
         }
     }.getOrDefault("unknown")
