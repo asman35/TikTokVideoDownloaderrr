@@ -114,8 +114,15 @@ private fun DownloaderScreen(viewModel: MainViewModel = viewModel()) {
 
             resolved.title?.takeIf { it.isNotBlank() }?.let {
                 Spacer(Modifier.height(4.dp))
-                Text(it, style = MaterialTheme.typography.bodyMedium)
+                Text(it, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             }
+
+            resolved.description
+                ?.takeIf { it.isNotBlank() && it != resolved.title }
+                ?.let {
+                    Spacer(Modifier.height(6.dp))
+                    Text(it, style = MaterialTheme.typography.bodyMedium)
+                }
 
             Spacer(Modifier.height(10.dp))
             Text("${resolved.items.size} medya bulundu")
@@ -155,16 +162,22 @@ private fun enqueueDownload(context: Context, media: MediaItem) {
     val isImage = media.type == MediaType.IMAGE
     val fallbackExt = if (isImage) "jpg" else "mp4"
 
-    val safeName = media.fileName
-        ?.replace(Regex("[^A-Za-z0-9._-]"), "_")
-        ?.takeIf { it.contains(".") }
+    val rawName = media.fileName
+        ?: media.title?.takeIf { it.isNotBlank() }?.let { "$it.$fallbackExt" }
         ?: "mediasave_${System.currentTimeMillis()}.$fallbackExt"
+
+    val safeName = rawName
+        .replace(Regex("[^\\p{L}\\p{N}._ -]"), "_")
+        .replace(Regex("\\s+"), " ")
+        .trim()
+        .take(140)
+        .let { if (it.contains(".")) it else "$it.$fallbackExt" }
 
     val directory = if (isImage) Environment.DIRECTORY_PICTURES else Environment.DIRECTORY_MOVIES
 
     val request = DownloadManager.Request(Uri.parse(media.downloadUrl))
         .setTitle(safeName)
-        .setDescription("MediaSave indiriyor")
+        .setDescription(media.description?.take(120) ?: media.title ?: "MediaSave indiriyor")
         .setMimeType(if (isImage) "image/jpeg" else "video/mp4")
         .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
         .setDestinationInExternalPublicDir(directory, "MediaSave/$safeName")
