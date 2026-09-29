@@ -16,7 +16,7 @@ android {
         versionName = "1.1"
 
         // Change this to your own HTTPS resolver API. The trailing slash is required.
-        buildConfigField("String", "API_BASE_URL", "\"https://example.com/\"")
+        buildConfigField("String", "API_BASE_URL", "\"https://tiktokvideodownloaderrr-production.up.railway.app/\"")
     }
 
     buildTypes {
