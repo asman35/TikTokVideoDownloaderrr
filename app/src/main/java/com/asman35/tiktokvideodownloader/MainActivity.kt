@@ -9,14 +9,17 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.weight
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -24,6 +27,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -49,9 +53,10 @@ class MainActivity : ComponentActivity() {
 private fun DownloaderScreen(viewModel: MainViewModel = viewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val clipboard = LocalClipboardManager.current
 
     Column(
-        modifier = Modifier.fillMaxSize().padding(24.dp),
+        modifier = Modifier.fillMaxSize().padding(20.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -65,21 +70,34 @@ private fun DownloaderScreen(viewModel: MainViewModel = viewModel()) {
             "TikTok • Instagram • YouTube • X",
             color = MaterialTheme.colorScheme.primary
         )
-        Spacer(Modifier.height(8.dp))
-        Text("Bağlantıyı yapıştırın. Platform otomatik algılanır.")
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(18.dp))
 
-        OutlinedTextField(
-            value = state.link,
-            onValueChange = viewModel::onLinkChanged,
+        Row(
             modifier = Modifier.fillMaxWidth(),
-            label = { Text("Bağlantı") },
-            placeholder = { Text("https://...") },
-            singleLine = true,
-            enabled = !state.isLoading
-        )
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            OutlinedTextField(
+                value = state.link,
+                onValueChange = viewModel::onLinkChanged,
+                modifier = Modifier.weight(1f),
+                label = { Text("Bağlantı") },
+                placeholder = { Text("https://...") },
+                singleLine = true,
+                enabled = !state.isLoading
+            )
+            Spacer(Modifier.padding(4.dp))
+            OutlinedButton(
+                onClick = {
+                    val text = clipboard.getText()?.text.orEmpty().trim()
+                    if (text.isNotBlank()) viewModel.onLinkChanged(text)
+                },
+                enabled = !state.isLoading
+            ) {
+                Text("Yapıştır")
+            }
+        }
 
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(14.dp))
         Button(
             onClick = viewModel::resolveLink,
             modifier = Modifier.fillMaxWidth(),
@@ -104,7 +122,7 @@ private fun DownloaderScreen(viewModel: MainViewModel = viewModel()) {
                 Text(it, style = MaterialTheme.typography.bodyMedium)
             }
 
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(10.dp))
             Text("${resolved.items.size} medya bulundu")
             Spacer(Modifier.height(12.dp))
 
@@ -125,7 +143,12 @@ private fun DownloaderScreen(viewModel: MainViewModel = viewModel()) {
             Text(it, color = MaterialTheme.colorScheme.primary)
         }
 
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(18.dp))
+        Text(
+            "İndirilen videolar Movies/MediaSave, görseller Pictures/MediaSave klasörüne kaydedilir.",
+            style = MaterialTheme.typography.bodySmall
+        )
+        Spacer(Modifier.height(6.dp))
         Text(
             "Yalnızca indirme hakkına sahip olduğunuz içerikleri indirin.",
             style = MaterialTheme.typography.bodySmall
@@ -142,13 +165,17 @@ private fun enqueueDownload(context: Context, media: MediaItem) {
         ?.takeIf { it.contains(".") }
         ?: "mediasave_${System.currentTimeMillis()}.$fallbackExt"
 
+    val directory = if (isImage) Environment.DIRECTORY_PICTURES else Environment.DIRECTORY_MOVIES
+
     val request = DownloadManager.Request(Uri.parse(media.downloadUrl))
         .setTitle(safeName)
         .setDescription("MediaSave indiriyor")
         .setMimeType(if (isImage) "image/jpeg" else "video/mp4")
         .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-        .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, safeName)
+        .setDestinationInExternalPublicDir(directory, "MediaSave/$safeName")
         .setAllowedOverMetered(true)
+        .setAllowedOverRoaming(true)
+        .allowScanningByMediaScanner()
 
     (context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager).enqueue(request)
 }
