@@ -89,8 +89,11 @@ class DownloaderRepository {
             .mapIndexed { index, item ->
                 MediaItem(
                     downloadUrl = item,
-                    fileName = "tiktok_${System.currentTimeMillis()}_${index + 1}.jpg",
-                    type = MediaType.IMAGE
+                    fileName = data.title?.takeIf { it.isNotBlank() }?.let { "${it}_${index + 1}.jpg" }
+                        ?: "tiktok_${System.currentTimeMillis()}_${index + 1}.jpg",
+                    type = MediaType.IMAGE,
+                    title = data.title,
+                    description = data.title
                 )
             }
 
@@ -113,8 +116,11 @@ class DownloaderRepository {
             items = listOf(
                 MediaItem(
                     downloadUrl = videoUrl,
-                    fileName = "tiktok_${System.currentTimeMillis()}.mp4",
-                    type = MediaType.VIDEO
+                    fileName = data.title?.takeIf { it.isNotBlank() }?.let { "${it}.mp4" }
+                        ?: "tiktok_${System.currentTimeMillis()}.mp4",
+                    type = MediaType.VIDEO,
+                    title = data.title,
+                    description = data.title
                 )
             )
         )
