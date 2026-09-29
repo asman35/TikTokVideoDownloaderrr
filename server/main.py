@@ -68,13 +68,14 @@ def yt_options(platform: str):
         "quiet": True,
         "skip_download": True,
         "noplaylist": True,
-        "format": "best[ext=mp4]/best",
+        "format": "bestvideo*+bestaudio/best",
+        "merge_output_format": "mp4",
         "extract_flat": False,
     }
     if platform == "YouTube":
         opts["extractor_args"] = {
             "youtube": {
-                "player_client": ["android_vr", "web_safari", "ios"]
+                "player_client": ["android_vr", "web_safari", "ios", "tv_embedded"]
             }
         }
     return opts
