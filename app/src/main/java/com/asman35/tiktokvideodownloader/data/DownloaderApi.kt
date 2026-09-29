@@ -5,9 +5,18 @@ import retrofit2.http.POST
 
 data class ResolveRequest(val url: String)
 
-data class ResolveResponse(
+enum class MediaType { VIDEO, IMAGE }
+
+data class MediaItem(
     val downloadUrl: String,
-    val fileName: String? = null
+    val fileName: String? = null,
+    val type: MediaType = MediaType.VIDEO
+)
+
+data class ResolveResponse(
+    val platform: String = "unknown",
+    val title: String? = null,
+    val items: List<MediaItem> = emptyList()
 )
 
 interface DownloaderApi {
