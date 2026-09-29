@@ -1,5 +1,6 @@
 package com.asman35.tiktokvideodownloader.data
 
+import com.asman35.tiktokvideodownloader.BuildConfig
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import retrofit2.Retrofit
@@ -46,16 +47,28 @@ class DownloaderRepository {
     suspend fun resolve(url: String): ResolveResponse {
         return when (detectPlatform(url)) {
             "tiktok" -> resolveTikTok(url)
-            "instagram" -> error("Instagram desteği için çözümleyici servis sonraki adımda bağlanacak.")
-            "youtube" -> error("YouTube desteği yalnızca indirme hakkınız olan içerikler için sonraki adımda bağlanacak.")
+            "instagram", "youtube" -> resolveWithServer(url)
             else -> error("Desteklenen bir TikTok, Instagram veya YouTube bağlantısı girin.")
         }
     }
 
+    private suspend fun resolveWithServer(url: String): ResolveResponse {
+        if (BuildConfig.API_BASE_URL.contains("example.com")) {
+            error("Instagram/YouTube sunucusu henüz bağlanmadı.")
+        }
+
+        val api = Retrofit.Builder()
+            .baseUrl(BuildConfig.API_BASE_URL)
+            .addConverterFactory(MoshiConverterFactory.create(moshi))
+            .build()
+            .create(DownloaderApi::class.java)
+
+        return api.resolve(ResolveRequest(url))
+    }
+
     private suspend fun resolveTikTok(url: String): ResolveResponse {
         val response = tikWmApi.resolve(url)
-        val data = response.data
-            ?: error(response.msg ?: "İçerik bilgileri alınamadı.")
+        val data = response.data ?: error(response.msg ?: "İçerik bilgileri alınamadı.")
 
         val imageItems = data.images.orEmpty()
             .filter { it.isNotBlank() }
