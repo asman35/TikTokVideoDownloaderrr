@@ -58,6 +58,7 @@ class MainViewModel(
 
     fun downloadStarted(count: Int) = _uiState.update {
         it.copy(
+            link = "",
             message = if (count > 1) "$count dosya indirmeye eklendi." else "İndirme başlatıldı.",
             resolved = null
         )
