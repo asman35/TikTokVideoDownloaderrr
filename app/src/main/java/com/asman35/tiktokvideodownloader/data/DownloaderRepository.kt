@@ -3,6 +3,7 @@ package com.asman35.tiktokvideodownloader.data
 import com.asman35.tiktokvideodownloader.BuildConfig
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
+import retrofit2.HttpException
 import retrofit2.Retrofit
 import retrofit2.converter.moshi.MoshiConverterFactory
 import retrofit2.http.Field
@@ -63,7 +64,20 @@ class DownloaderRepository {
             .build()
             .create(DownloaderApi::class.java)
 
-        return api.resolve(ResolveRequest(url))
+        return try {
+            api.resolve(ResolveRequest(url))
+        } catch (error: HttpException) {
+            val raw = error.response()?.errorBody()?.string().orEmpty()
+            val detail = Regex("\\\"detail\\\"\\s*:\\s*\\\"([^\\\"]+)\\\"")
+                .find(raw)?.groupValues?.getOrNull(1)
+                ?.replace("\\u0131", "ı")
+                ?.replace("\\u011f", "ğ")
+                ?.replace("\\u015f", "ş")
+                ?.replace("\\u00fc", "ü")
+                ?.replace("\\u00f6", "ö")
+                ?.replace("\\u00e7", "ç")
+            error(detail ?: "Sunucu hatası: HTTP ${error.code()}")
+        }
     }
 
     private suspend fun resolveTikTok(url: String): ResolveResponse {
