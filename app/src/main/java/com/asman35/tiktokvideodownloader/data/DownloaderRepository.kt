@@ -7,6 +7,7 @@ import retrofit2.converter.moshi.MoshiConverterFactory
 import retrofit2.http.Field
 import retrofit2.http.FormUrlEncoded
 import retrofit2.http.POST
+import java.net.URI
 
 private data class TikWmResponse(
     val code: Int? = null,
@@ -17,7 +18,8 @@ private data class TikWmResponse(
 private data class TikWmData(
     val play: String? = null,
     val hdplay: String? = null,
-    val title: String? = null
+    val title: String? = null,
+    val images: List<String>? = null
 )
 
 private interface TikWmApi {
@@ -35,26 +37,71 @@ class DownloaderRepository {
         .addLast(KotlinJsonAdapterFactory())
         .build()
 
-    private val api: TikWmApi = Retrofit.Builder()
+    private val tikWmApi: TikWmApi = Retrofit.Builder()
         .baseUrl("https://www.tikwm.com/")
         .addConverterFactory(MoshiConverterFactory.create(moshi))
         .build()
         .create(TikWmApi::class.java)
 
     suspend fun resolve(url: String): ResolveResponse {
-        val response = api.resolve(url)
+        return when (detectPlatform(url)) {
+            "tiktok" -> resolveTikTok(url)
+            "instagram" -> error("Instagram desteği için çözümleyici servis sonraki adımda bağlanacak.")
+            "youtube" -> error("YouTube desteği yalnızca indirme hakkınız olan içerikler için sonraki adımda bağlanacak.")
+            else -> error("Desteklenen bir TikTok, Instagram veya YouTube bağlantısı girin.")
+        }
+    }
 
-        val video = response.data
-            ?: error(response.msg ?: "Video bilgileri alınamadı.")
+    private suspend fun resolveTikTok(url: String): ResolveResponse {
+        val response = tikWmApi.resolve(url)
+        val data = response.data
+            ?: error(response.msg ?: "İçerik bilgileri alınamadı.")
 
-        val downloadUrl = video.hdplay
+        val imageItems = data.images.orEmpty()
+            .filter { it.isNotBlank() }
+            .mapIndexed { index, item ->
+                MediaItem(
+                    downloadUrl = item,
+                    fileName = "tiktok_${System.currentTimeMillis()}_${index + 1}.jpg",
+                    type = MediaType.IMAGE
+                )
+            }
+
+        if (imageItems.isNotEmpty()) {
+            return ResolveResponse(
+                platform = "TikTok",
+                title = data.title,
+                items = imageItems
+            )
+        }
+
+        val videoUrl = data.hdplay
             ?.takeIf { it.isNotBlank() }
-            ?: video.play?.takeIf { it.isNotBlank() }
-            ?: error("İndirilebilir video bağlantısı bulunamadı.")
+            ?: data.play?.takeIf { it.isNotBlank() }
+            ?: error("İndirilebilir medya bulunamadı.")
 
         return ResolveResponse(
-            downloadUrl = downloadUrl,
-            fileName = "tiktok_${System.currentTimeMillis()}.mp4"
+            platform = "TikTok",
+            title = data.title,
+            items = listOf(
+                MediaItem(
+                    downloadUrl = videoUrl,
+                    fileName = "tiktok_${System.currentTimeMillis()}.mp4",
+                    type = MediaType.VIDEO
+                )
+            )
         )
     }
+
+    fun detectPlatform(value: String): String = runCatching {
+        val uri = URI(value)
+        if (uri.scheme !in listOf("http", "https")) return@runCatching "unknown"
+        val host = uri.host?.lowercase().orEmpty()
+        when {
+            host == "tiktok.com" || host.endsWith(".tiktok.com") -> "tiktok"
+            host == "instagram.com" || host.endsWith(".instagram.com") -> "instagram"
+            host == "youtube.com" || host.endsWith(".youtube.com") || host == "youtu.be" -> "youtube"
+            else -> "unknown"
+        }
+    }.getOrDefault("unknown")
 }
