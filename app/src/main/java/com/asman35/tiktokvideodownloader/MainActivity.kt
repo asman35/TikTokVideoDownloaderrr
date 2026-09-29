@@ -9,13 +9,11 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.weight
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -72,29 +70,26 @@ private fun DownloaderScreen(viewModel: MainViewModel = viewModel()) {
         )
         Spacer(Modifier.height(18.dp))
 
-        Row(
+        OutlinedTextField(
+            value = state.link,
+            onValueChange = viewModel::onLinkChanged,
             modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
+            label = { Text("Bağlantı") },
+            placeholder = { Text("https://...") },
+            singleLine = true,
+            enabled = !state.isLoading
+        )
+
+        Spacer(Modifier.height(8.dp))
+        OutlinedButton(
+            onClick = {
+                val text = clipboard.getText()?.text.orEmpty().trim()
+                if (text.isNotBlank()) viewModel.onLinkChanged(text)
+            },
+            modifier = Modifier.fillMaxWidth(),
+            enabled = !state.isLoading
         ) {
-            OutlinedTextField(
-                value = state.link,
-                onValueChange = viewModel::onLinkChanged,
-                modifier = Modifier.weight(1f),
-                label = { Text("Bağlantı") },
-                placeholder = { Text("https://...") },
-                singleLine = true,
-                enabled = !state.isLoading
-            )
-            Spacer(Modifier.padding(4.dp))
-            OutlinedButton(
-                onClick = {
-                    val text = clipboard.getText()?.text.orEmpty().trim()
-                    if (text.isNotBlank()) viewModel.onLinkChanged(text)
-                },
-                enabled = !state.isLoading
-            ) {
-                Text("Yapıştır")
-            }
+            Text("Panodan Yapıştır")
         }
 
         Spacer(Modifier.height(14.dp))
@@ -175,7 +170,7 @@ private fun enqueueDownload(context: Context, media: MediaItem) {
         .setDestinationInExternalPublicDir(directory, "MediaSave/$safeName")
         .setAllowedOverMetered(true)
         .setAllowedOverRoaming(true)
-        .allowScanningByMediaScanner()
 
+    request.allowScanningByMediaScanner()
     (context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager).enqueue(request)
 }
