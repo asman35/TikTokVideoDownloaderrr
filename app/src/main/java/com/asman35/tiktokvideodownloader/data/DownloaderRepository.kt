@@ -55,38 +55,20 @@ class DownloaderRepository {
     }
 
     private suspend fun resolveYouTubeMeta(url: String): ResolveResponse {
-        if (BuildConfig.API_BASE_URL.contains("example.com")) {
-            error("YouTube sunucusu henüz bağlanmadı.")
-        }
-
-        val api = Retrofit.Builder()
-            .baseUrl(BuildConfig.API_BASE_URL)
-            .addConverterFactory(MoshiConverterFactory.create(moshi))
-            .build()
-            .create(DownloaderApi::class.java)
-
-        return try {
-            val meta = api.youtubeMeta(ResolveRequest(url))
-            ResolveResponse(
-                platform = "YouTube",
-                title = meta.title,
-                description = meta.description,
-                items = listOf(
-                    MediaItem(
-                        downloadUrl = url,
-                        fileName = meta.title?.takeIf { it.isNotBlank() }?.let { "${it}.mp4" },
-                        type = MediaType.VIDEO,
-                        title = meta.title,
-                        description = meta.description
-                    )
+        return ResolveResponse(
+            platform = "YouTube",
+            title = "YouTube Video",
+            description = "Video telefondan doğrudan MP4 olarak indirilecek.",
+            items = listOf(
+                MediaItem(
+                    downloadUrl = url,
+                    fileName = "YouTube Video.mp4",
+                    type = MediaType.VIDEO,
+                    title = "YouTube Video",
+                    description = "Video telefondan doğrudan MP4 olarak indirilecek."
                 )
             )
-        } catch (error: HttpException) {
-            val raw = error.response()?.errorBody()?.string().orEmpty()
-            val detail = Regex("""\"detail\"\\s*:\\s*\"([^\"]+)\"""")
-                .find(raw)?.groupValues?.getOrNull(1)
-            error(detail ?: "YouTube bilgileri alınamadı: HTTP ${error.code()}")
-        }
+        )
     }
 
     private suspend fun resolveWithServer(url: String): ResolveResponse {
