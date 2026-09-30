@@ -495,6 +495,12 @@ def resolve(req: ResolveRequest, request: Request):
             }]
         }
 
+    if platform == "YouTube":
+        raise HTTPException(
+            status_code=400,
+            detail="Bu YouTube videosunda gerçek MP4 akışı alınamadı. Sahte/bozuk 3 saniyelik dosya indirmek yerine indirme durduruldu."
+        )
+
     og_videos, og_images = scrape_og_media(req.url)
 
     if og_videos:
