@@ -101,6 +101,7 @@ class DownloaderRepository {
             return ResolveResponse(
                 platform = "TikTok",
                 title = data.title,
+                description = data.title,
                 items = imageItems
             )
         }
@@ -113,6 +114,7 @@ class DownloaderRepository {
         return ResolveResponse(
             platform = "TikTok",
             title = data.title,
+            description = data.title,
             items = listOf(
                 MediaItem(
                     downloadUrl = videoUrl,
