@@ -531,8 +531,8 @@ def resolve(req: ResolveRequest, request: Request):
             items = []
             for media in fb_data["items"]:
                 base = safe_name(title, "facebook_media")
-                suffix = f"_{media[\"index\"]}" if len(fb_data["items"]) > 1 else ""
-                file_name = f"{base}{suffix}.{media[\"ext\"]}"
+                suffix = f"_{media['index']}" if len(fb_data["items"]) > 1 else ""
+                file_name = f"{base}{suffix}.{media['ext']}"
                 items.append({
                     "downloadUrl": build_asset_url(request, media["url"], req.url, file_name),
                     "fileName": file_name,
