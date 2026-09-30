@@ -391,6 +391,27 @@ def download_video(url: str, name: str = "mediasave_video.mp4"):
             ) from exc
         raise HTTPException(status_code=400, detail=f"{platform} videosu indirilemedi.") from exc
 
+
+@app.post("/youtube-meta")
+def youtube_meta(req: ResolveRequest):
+    host = safe_host(req.url)
+    if platform_for(host) != "YouTube":
+        raise HTTPException(status_code=400, detail="Bu uç nokta yalnızca YouTube içindir.")
+
+    try:
+        with yt_dlp.YoutubeDL(yt_options("YouTube", download=False)) as ydl:
+            info = ydl.extract_info(req.url, download=False)
+        return {
+            "platform": "YouTube",
+            "title": (info.get("title") or "").strip() or "YouTube Video",
+            "description": (info.get("description") or "").strip() or None
+        }
+    except Exception as exc:
+        raise HTTPException(
+            status_code=400,
+            detail="YouTube video bilgileri alınamadı."
+        ) from exc
+
 @app.post("/resolve")
 def resolve(req: ResolveRequest, request: Request):
     host = safe_host(req.url)
