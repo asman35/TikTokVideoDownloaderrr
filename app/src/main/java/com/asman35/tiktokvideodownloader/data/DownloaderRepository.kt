@@ -48,9 +48,9 @@ class DownloaderRepository {
     suspend fun resolve(url: String): ResolveResponse {
         return when (detectPlatform(url)) {
             "tiktok" -> resolveTikTok(url)
-            "instagram", "twitter" -> resolveWithServer(url)
+            "instagram", "twitter", "facebook" -> resolveWithServer(url)
             "youtube" -> resolveYouTubeMeta(url)
-            else -> error("Desteklenen bir TikTok, Instagram, YouTube veya X bağlantısı girin.")
+            else -> error("Desteklenen bir TikTok, Instagram, Facebook, YouTube veya X bağlantısı girin.")
         }
     }
 
@@ -154,6 +154,7 @@ class DownloaderRepository {
             host == "tiktok.com" || host.endsWith(".tiktok.com") -> "tiktok"
             host == "instagram.com" || host.endsWith(".instagram.com") -> "instagram"
             host == "youtube.com" || host.endsWith(".youtube.com") || host == "youtu.be" -> "youtube"
+            host == "facebook.com" || host.endsWith(".facebook.com") || host == "fb.watch" || host.endsWith(".fb.watch") -> "facebook"
             host == "x.com" || host.endsWith(".x.com") || host == "twitter.com" || host.endsWith(".twitter.com") -> "twitter"
             else -> "unknown"
         }
