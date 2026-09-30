@@ -56,6 +56,18 @@ class MainViewModel(
         }
     }
 
+    fun downloadProgress(message: String) = _uiState.update {
+        it.copy(message = message)
+    }
+
+    fun downloadCompleted(message: String) = _uiState.update {
+        it.copy(link = "", message = message, resolved = null)
+    }
+
+    fun downloadFailed(message: String) = _uiState.update {
+        it.copy(message = message)
+    }
+
     fun downloadStarted(count: Int) = _uiState.update {
         it.copy(
             link = "",
