@@ -94,7 +94,7 @@ def instagram_shortcode(url: str):
 def instagram_graphql_media(url: str):
     shortcode = instagram_shortcode(url)
     if not shortcode:
-        return []
+        return {"items": [], "title": None, "description": None}
 
     jar = http.cookiejar.CookieJar()
     opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(jar))
@@ -141,7 +141,7 @@ def instagram_graphql_media(url: str):
         with opener.open(req, timeout=20) as response:
             payload = json.loads(response.read().decode("utf-8", errors="ignore"))
     except Exception:
-        return []
+        return {"items": [], "title": None, "description": None}
 
     node = (
         payload.get("data", {})
@@ -149,7 +149,7 @@ def instagram_graphql_media(url: str):
     )
     items = node.get("items") or []
     if not items:
-        return []
+        return {"items": [], "title": None, "description": None}
 
     root = items[0]
     children = root.get("carousel_media") or [root]
@@ -185,11 +185,11 @@ def instagram_graphql_media(url: str):
                     "index": index
                 })
 
-    return result
+    return {"items": result, "title": caption_text, "description": caption_text}
 
 
 def x_status_id(url: str):
-    match = re.search(r"/status/(\\d+)", urlparse(url).path)
+    match = re.search(r"/status/(\d+)", urlparse(url).path)
     return match.group(1) if match else None
 
 def fxtwitter_media(url: str):
@@ -208,8 +208,8 @@ def fxtwitter_media(url: str):
     except Exception:
         return None
 
-    status = payload.get("status") or {}
-    if status.get("type") != "status":
+    status = payload.get("status") or payload.get("tweet") or {}
+    if not isinstance(status, dict):
         return None
 
     media = status.get("media") or {}
@@ -244,9 +244,16 @@ def fxtwitter_media(url: str):
                     "index": index
                 })
 
+    text_value = (
+        status.get("text")
+        or status.get("raw_text")
+        or status.get("description")
+        or ""
+    ).strip() or None
+
     return {
-        "title": (status.get("text") or "").strip() or None,
-        "description": (status.get("text") or "").strip() or None,
+        "title": text_value,
+        "description": text_value,
         "items": result
     }
 
@@ -274,7 +281,7 @@ def yt_options(platform: str, download: bool = False):
     if platform == "YouTube":
         opts["extractor_args"] = {
             "youtube": {
-                "player_client": ["android_vr", "web_safari", "ios", "tv_embedded"]
+                "player_client": ["web_safari", "ios", "web"]
             }
         }
     return opts
@@ -380,7 +387,7 @@ def download_video(url: str, name: str = "mediasave_video.mp4"):
         if platform == "YouTube":
             raise HTTPException(
                 status_code=400,
-                detail="YouTube bu video için sunucu doğrulaması istedi veya medya alınamadı."
+                detail="YouTube bu videonun medya akışına sunucu erişimini engelledi. Başka bir herkese açık video deneyin."
             ) from exc
         raise HTTPException(status_code=400, detail=f"{platform} videosu indirilemedi.") from exc
 
@@ -448,10 +455,33 @@ def resolve(req: ResolveRequest, request: Request):
         title = (info.get("title") or "").strip() or f"{platform} {media_id}"
         description = (info.get("description") or "").strip() or None
         file_name = f"{safe_name(title, platform.lower() + '_' + media_id)}.mp4"
+
         direct = (
             f"{public_base(request)}/download-video?url={quote(req.url, safe='')}"
             f"&name={quote(file_name, safe='')}"
         )
+
+        if platform == "YouTube":
+            muxed = []
+            for fmt in info.get("formats") or []:
+                if (
+                    fmt.get("url")
+                    and fmt.get("ext") == "mp4"
+                    and fmt.get("vcodec") not in (None, "none")
+                    and fmt.get("acodec") not in (None, "none")
+                ):
+                    muxed.append(fmt)
+            if muxed:
+                muxed.sort(
+                    key=lambda f: (
+                        f.get("height") or 0,
+                        f.get("tbr") or 0
+                    ),
+                    reverse=True
+                )
+                chosen = muxed[0]
+                direct = build_asset_url(request, chosen["url"], req.url, file_name)
+
         return {
             "platform": platform,
             "title": title,
