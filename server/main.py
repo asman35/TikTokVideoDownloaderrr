@@ -23,6 +23,7 @@ class ResolveRequest(BaseModel):
 
 ALLOWED = {
     "instagram.com", "www.instagram.com",
+    "facebook.com", "www.facebook.com", "m.facebook.com", "mbasic.facebook.com", "web.facebook.com", "fb.watch",
     "youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be",
     "x.com", "www.x.com", "twitter.com", "www.twitter.com", "mobile.twitter.com"
 }
@@ -34,7 +35,7 @@ UA = (
 
 def safe_host(url: str) -> str:
     host = (urlparse(url).hostname or "").lower()
-    suffixes = ["instagram.com", "youtube.com", "x.com", "twitter.com"]
+    suffixes = ["instagram.com", "facebook.com", "fb.watch", "youtube.com", "x.com", "twitter.com"]
     if host not in ALLOWED and not any(host.endswith("." + d) for d in suffixes):
         raise HTTPException(status_code=400, detail="Unsupported domain")
     return host
@@ -42,6 +43,8 @@ def safe_host(url: str) -> str:
 def platform_for(host: str) -> str:
     if "instagram" in host:
         return "Instagram"
+    if "facebook" in host or host.endswith("fb.watch"):
+        return "Facebook"
     if host.endswith("x.com") or "twitter" in host:
         return "X"
     return "YouTube"
@@ -187,6 +190,87 @@ def instagram_graphql_media(url: str):
 
     return {"items": result, "title": caption_text, "description": caption_text}
 
+
+
+def facebook_media(url: str):
+    req = urllib.request.Request(
+        url,
+        headers={
+            "User-Agent": UA,
+            "Accept-Language": "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7"
+        }
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=20) as response:
+            page = response.read().decode("utf-8", errors="ignore")
+    except Exception:
+        return {"items": [], "title": None, "description": None}
+
+    def meta_value(prop: str):
+        patterns = [
+            rf'<meta[^>]+property=["\']{re.escape(prop)}["\'][^>]+content=["\']([^"\']+)["\']',
+            rf'<meta[^>]+content=["\']([^"\']+)["\'][^>]+property=["\']{re.escape(prop)}["\']'
+        ]
+        for pattern in patterns:
+            match = re.search(pattern, page, flags=re.I)
+            if match:
+                return html.unescape(match.group(1))
+        return None
+
+    title = (meta_value("og:title") or "").strip() or None
+    description = (meta_value("og:description") or "").strip() or None
+
+    videos = []
+    for prop in ("og:video", "og:video:url", "og:video:secure_url"):
+        value = meta_value(prop)
+        if value and value.startswith("http") and value not in videos:
+            videos.append(value)
+
+    if videos:
+        return {
+            "title": title,
+            "description": description,
+            "items": [
+                {"url": item, "type": "VIDEO", "ext": "mp4", "index": index}
+                for index, item in enumerate(videos, start=1)
+            ]
+        }
+
+    image_candidates = []
+    og_image = meta_value("og:image")
+    if og_image and og_image.startswith("http"):
+        image_candidates.append(html.unescape(og_image))
+
+    json_patterns = [
+        r'"photo_image"\s*:\s*\{[^{}]*?"uri"\s*:\s*"([^"]+)"',
+        r'"image"\s*:\s*\{[^{}]*?"uri"\s*:\s*"([^"]+)"',
+        r'"viewer_image"\s*:\s*\{[^{}]*?"uri"\s*:\s*"([^"]+)"'
+    ]
+    for pattern in json_patterns:
+        for raw in re.findall(pattern, page, flags=re.I):
+            candidate = raw.replace("\\/", "/")
+            candidate = candidate.replace("\\u0025", "%").replace("\\u0026", "&").replace("\\u003d", "=")
+            candidate = html.unescape(candidate)
+            if candidate.startswith("http") and ("fbcdn.net" in candidate or "scontent" in candidate):
+                image_candidates.append(candidate)
+
+    deduped = []
+    seen = set()
+    for item in image_candidates:
+        normalized = item.replace("&amp;", "&")
+        key = normalized.split("?")[0]
+        if key not in seen:
+            seen.add(key)
+            deduped.append(normalized)
+
+    return {
+        "title": title,
+        "description": description,
+        "items": [
+            {"url": item, "type": "IMAGE", "ext": "jpg", "index": index}
+            for index, item in enumerate(deduped, start=1)
+        ]
+    }
 
 def x_status_id(url: str):
     match = re.search(r"/status/(\d+)", urlparse(url).path)
@@ -437,6 +521,29 @@ def resolve(req: ResolveRequest, request: Request):
                 "platform": platform,
                 "title": title,
                 "description": ig_data.get("description"),
+                "items": items
+            }
+
+    if platform == "Facebook":
+        fb_data = facebook_media(req.url)
+        if fb_data and fb_data.get("items"):
+            title = fb_data.get("title") or "Facebook media"
+            items = []
+            for media in fb_data["items"]:
+                base = safe_name(title, "facebook_media")
+                suffix = f"_{media[\"index\"]}" if len(fb_data["items"]) > 1 else ""
+                file_name = f"{base}{suffix}.{media[\"ext\"]}"
+                items.append({
+                    "downloadUrl": build_asset_url(request, media["url"], req.url, file_name),
+                    "fileName": file_name,
+                    "type": media["type"],
+                    "title": title,
+                    "description": fb_data.get("description")
+                })
+            return {
+                "platform": platform,
+                "title": title,
+                "description": fb_data.get("description"),
                 "items": items
             }
 
