@@ -62,7 +62,7 @@ private fun DownloaderScreen(viewModel: MainViewModel = viewModel()) {
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
     val scope = rememberCoroutineScope()
-    var youtubeDownloading by remember { mutableStateOf(false) }
+    var videoDownloading by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -79,7 +79,7 @@ private fun DownloaderScreen(viewModel: MainViewModel = viewModel()) {
         )
         Spacer(Modifier.height(6.dp))
         Text(
-            "TikTok • Instagram • YouTube • X",
+            "TikTok • Instagram • Facebook • YouTube • X",
             color = MaterialTheme.colorScheme.primary
         )
         Spacer(Modifier.height(18.dp))
@@ -156,7 +156,7 @@ private fun DownloaderScreen(viewModel: MainViewModel = viewModel()) {
                     if (resolved.platform == "YouTube") {
                         val sourceUrl = state.link
                         scope.launch {
-                            youtubeDownloading = true
+                            videoDownloading = true
                             viewModel.downloadProgress("YouTube videosu telefondan MP4 olarak indiriliyor…")
                             try {
                                 val fileName = YoutubeLocalDownloader.download(
@@ -164,24 +164,65 @@ private fun DownloaderScreen(viewModel: MainViewModel = viewModel()) {
                                     url = sourceUrl,
                                     title = resolved.title
                                 )
+                                MediaGalleryDownloader.triggerMediaScan(context, fileName)
                                 viewModel.downloadCompleted("$fileName galeriye kaydedildi.")
                             } catch (e: Exception) {
                                 viewModel.downloadFailed(
                                     e.message ?: "YouTube videosu indirilemedi."
                                 )
                             } finally {
-                                youtubeDownloading = false
+                                videoDownloading = false
                             }
                         }
                     } else {
-                        resolved.items.forEach { enqueueDownload(context, it) }
-                        viewModel.downloadStarted(resolved.items.size)
+                        val videos = resolved.items.filter { it.type == MediaType.VIDEO }
+                        val images = resolved.items.filter { it.type == MediaType.IMAGE }
+
+                        images.forEach { enqueueDownload(context, it) }
+
+                        if (videos.isEmpty()) {
+                            viewModel.downloadStarted(images.size)
+                        } else {
+                            scope.launch {
+                                videoDownloading = true
+                                viewModel.downloadProgress(
+                                    if (videos.size > 1) "${videos.size} video galeriye kaydediliyor…"
+                                    else "Video galeriye kaydediliyor…"
+                                )
+                                try {
+                                    videos.forEachIndexed { index, item ->
+                                        MediaGalleryDownloader.downloadVideo(
+                                            context = context,
+                                            url = item.downloadUrl,
+                                            title = item.fileName ?: item.title
+                                        )
+                                        if (videos.size > 1) {
+                                            viewModel.downloadProgress(
+                                                "${index + 1}/${videos.size} video galeriye kaydedildi…"
+                                            )
+                                        }
+                                    }
+
+                                    val total = videos.size + images.size
+                                    viewModel.downloadCompleted(
+                                        if (total > 1) "$total medya indirildi ve videolar galeriye işlendi."
+                                        else "Video indirildi ve galeriye işlendi."
+                                    )
+                                } catch (e: Exception) {
+                                    viewModel.downloadFailed(
+                                        e.message ?: "Video galeriye kaydedilemedi."
+                                    )
+                                } finally {
+                                    videoDownloading = false
+                                }
+                            }
+                        }
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),
-                enabled = resolved.items.isNotEmpty() && !youtubeDownloading
+                enabled = resolved.items.isNotEmpty() && !videoDownloading
             ) {
-                if (youtubeDownloading && resolved.platform == "YouTube") {
+                if (videoDownloading) {
                     CircularProgressIndicator(
                         modifier = Modifier.height(20.dp),
                         strokeWidth = 2.dp
