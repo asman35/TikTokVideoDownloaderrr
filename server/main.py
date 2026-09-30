@@ -467,8 +467,8 @@ def resolve(req: ResolveRequest, request: Request):
                 if (
                     fmt.get("url")
                     and fmt.get("ext") == "mp4"
-                    and fmt.get("vcodec") not in (None, "none")
-                    and fmt.get("acodec") not in (None, "none")
+                    and str(fmt.get("vcodec") or "").startswith("avc1")
+                    and str(fmt.get("acodec") or "").startswith("mp4a")
                 ):
                     muxed.append(fmt)
             if muxed:
