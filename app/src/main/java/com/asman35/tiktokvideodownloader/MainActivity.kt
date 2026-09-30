@@ -26,6 +26,10 @@ import androidx.compose.material3.Text
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -56,6 +60,8 @@ private fun DownloaderScreen(viewModel: MainViewModel = viewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
+    val scope = rememberCoroutineScope()
+    var youtubeDownloading by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -146,13 +152,42 @@ private fun DownloaderScreen(viewModel: MainViewModel = viewModel()) {
 
             Button(
                 onClick = {
-                    resolved.items.forEach { enqueueDownload(context, it) }
-                    viewModel.downloadStarted(resolved.items.size)
+                    if (resolved.platform == "YouTube") {
+                        val sourceUrl = state.link
+                        scope.launch {
+                            youtubeDownloading = true
+                            viewModel.downloadProgress("YouTube videosu telefondan MP4 olarak indiriliyor…")
+                            try {
+                                val fileName = YoutubeLocalDownloader.download(
+                                    context = context,
+                                    url = sourceUrl,
+                                    title = resolved.title
+                                )
+                                viewModel.downloadCompleted("$fileName galeriye kaydedildi.")
+                            } catch (e: Exception) {
+                                viewModel.downloadFailed(
+                                    e.message ?: "YouTube videosu indirilemedi."
+                                )
+                            } finally {
+                                youtubeDownloading = false
+                            }
+                        }
+                    } else {
+                        resolved.items.forEach { enqueueDownload(context, it) }
+                        viewModel.downloadStarted(resolved.items.size)
+                    }
                 },
                 modifier = Modifier.fillMaxWidth(),
-                enabled = resolved.items.isNotEmpty()
+                enabled = resolved.items.isNotEmpty() && !youtubeDownloading
             ) {
-                Text(if (resolved.items.size > 1) "Tümünü İndir" else "İndir")
+                if (youtubeDownloading && resolved.platform == "YouTube") {
+                    CircularProgressIndicator(
+                        modifier = Modifier.height(20.dp),
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    Text(if (resolved.items.size > 1) "Tümünü İndir" else "İndir")
+                }
             }
         }
 
