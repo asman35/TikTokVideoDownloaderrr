@@ -83,7 +83,7 @@ class DownloaderRepository {
             )
         } catch (error: HttpException) {
             val raw = error.response()?.errorBody()?.string().orEmpty()
-            val detail = Regex("\\"detail\\"\\s*:\\s*\\"([^\\"]+)\\"")
+            val detail = Regex("""\"detail\"\\s*:\\s*\"([^\"]+)\"""")
                 .find(raw)?.groupValues?.getOrNull(1)
             error(detail ?: "YouTube bilgileri alınamadı: HTTP ${error.code()}")
         }
