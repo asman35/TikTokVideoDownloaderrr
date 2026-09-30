@@ -12,8 +12,8 @@ android {
         applicationId = "com.asman35.tiktokvideodownloader"
         minSdk = 26
         targetSdk = 35
-        versionCode = 8
-        versionName = "1.7"
+        versionCode = 9
+        versionName = "1.8"
 
         // Change this to your own HTTPS resolver API. The trailing slash is required.
         buildConfigField("String", "API_BASE_URL", "\"https://tiktokvideodownloaderrr-production.up.railway.app/\"")
@@ -51,5 +51,6 @@ dependencies {
     implementation("com.squareup.retrofit2:retrofit:2.11.0")
     implementation("com.squareup.retrofit2:converter-moshi:2.11.0")
     implementation("com.squareup.moshi:moshi-kotlin:1.15.2")
+    implementation("dev.ffmpegkit-maintained:yt-dlp-android:2.0.2")
     debugImplementation("androidx.compose.ui:ui-tooling")
 }
